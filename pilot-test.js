@@ -26,7 +26,7 @@ const CONFIG = {
 };
 
 (async function insertIconsWhenReady() {
-  let observer;
+  let cachedTranslation = null;
 
   async function initInsert() {
     try {
@@ -109,9 +109,16 @@ const CONFIG = {
   }
 
   function getLocalTranslation() {
+    if (cachedTranslation !== null) {
+      console.log("return cached translation");
+      return cachedTranslation;
+    }
     try {
       const nextDataElement = document.getElementById("__NEXT_DATA__");
-      if (!nextDataElement) return "Rekomenduojama";
+      if (!nextDataElement) {
+        cachedTranslation = "Rekomenduojama";
+        return cachedTranslation;
+      }
 
       const nextData = JSON.parse(nextDataElement.textContent);
       const selectedLanguage =
@@ -122,24 +129,25 @@ const CONFIG = {
         "en-US": "Recommended",
       };
 
-      return translations[selectedLanguage] || "Rekomenduojama";
+      cachedTranslation = translations[selectedLanguage] || "Rekomenduojama";
+
+      return cachedTranslation;
     } catch (error) {
-      return "Rekomenduojama";
+      cachedTranslation = "Rekomenduojama";
+
+      return cachedTranslation;
     }
   }
 
   function applyStyles(element) {
-    Object.assign(element.style, {
-      display: "flex",
-      gap: "8px",
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: "#fab60b",
-      color: "#ffffff",
-    });
-
-    element.style.setProperty("display", "flex", "important");
-    element.style.setProperty("background-color", "#fab60b", "important");
+    element.style.cssText = `
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background-color: #fab60b !important;
+  color: #ffffff !important;
+`;
   }
 
   function debounce(fn, delay) {
@@ -157,20 +165,30 @@ const CONFIG = {
   }
 
   const debouncedInit = debounce(initInsert, CONFIG.debounceDelay);
-  observer = new MutationObserver((mutations) => {
-    console.log("mutation observer");
-    const needsCheck = mutations.some(
-      (m) =>
-        m.target.closest(".top-hotel") ||
-        Array.from(m.addedNodes).some(
-          (n) =>
-            n.nodeType === 1 &&
-            (n.matches?.(".top-hotel") || n.querySelector?.(".top-hotel"))
-        )
-    );
+  const observer = new MutationObserver((mutations) => {
+    let foundNewContainers = false;
 
-    if (needsCheck) {
-      console.log("needscheck");
+    for (const m of mutations) {
+      if (m.target && m.target.nodeType === 1) {
+        if (
+          m.target.matches?.(".top-hotel") ||
+          m.target.querySelector?.(".top-hotel")
+        ) {
+          foundNewContainers = true;
+        }
+      }
+
+      for (const node of m.addedNodes) {
+        if (
+          node.nodeType === 1 &&
+          (node.matches?.(".top-hotel") || node.querySelector?.(".top-hotel"))
+        ) {
+          foundNewContainers = true;
+        }
+      }
+    }
+
+    if (foundNewContainers) {
       debouncedInit();
     }
   });
